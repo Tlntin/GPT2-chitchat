@@ -43,6 +43,7 @@ def create_model(vocab_size, device):
         model = GPT2LMHeadModel(config=model_config)
     # 根据tokenizer的vocabulary调整GPT2模型的voca的大小
     model.resize_token_embeddings(vocab_size)
+    nct_x = model.config.to_dict().get("n_ctx")
     # print('model config:\n{}'.format(model.config.to_json_string()))
     model = model.to(device)
     # 是否使用多块GPU进行并行运算
@@ -62,7 +63,6 @@ def create_model(vocab_size, device):
     for parameter in parameters:
         num_parameters += parameter.numel()
     print('number of model parameters: {}'.format(num_parameters))
-    nct_x = model.config.to_dict().get("n_ctx")
     return model, nct_x, multi_gpu
 
 
