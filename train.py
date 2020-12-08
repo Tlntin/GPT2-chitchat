@@ -68,7 +68,7 @@ def create_model(vocab_size, device):
 
 def train(model, device, train_dataloader, test_dataloader, multi_gpu, args):
     # 初始参数
-    epoch, epochs_since_improvement, best_loss = load_checkpoint()
+    start_epoch, epochs_since_improvement, best_loss = load_checkpoint()
     model.train()
     # 计算所有epoch进行参数优化的总步数total_steps
     total_steps = int(len(train_dataloader) * args.epochs / args.gradient_accumulation)
@@ -87,7 +87,7 @@ def train(model, device, train_dataloader, test_dataloader, multi_gpu, args):
     tb_writer = SummaryWriter(log_dir=args.writer_dir)
     # 记录 out of memory的次数
     # 开始训练
-    for epoch in range(args.epochs):
+    for epoch in range(start_epoch, args.epochs):
         epoch_start_time = datetime.now()
         running_train_loss = 0
         running_train_correct = 0  # 记录预测正确的值
@@ -129,7 +129,7 @@ def train(model, device, train_dataloader, test_dataloader, multi_gpu, args):
                 if (overall_step + 1) % args.log_step == 0:
                     tb_writer.add_scalar('loss', loss.item(), overall_step)
             # 输出最新loss与acc
-            data_iter.set_description("训练集epoch {}/{} loss {:.4f}, accuracy {:.2f}%"\
+            data_iter.set_description("训练集epoch {}/{} train_loss {:.4f}, train_accuracy {:.2f}%"\
                                       .format(epoch + 1, config.epochs, loss, accuracy * 100))
         epoch_train_loss = running_train_loss / running_train_num
         epoch_train_acc = running_train_correct / running_train_num
@@ -170,7 +170,7 @@ def evaluate(epoch, model, device, test_dataloader, multi_gpu, args):
     with torch.no_grad():
         data_iter = tqdm(enumerate(test_dataloader), total=len(test_dataloader))
         for batch_idx, input_ids in data_iter:
-            input_ids.to(device)
+            input_ids = input_ids.to(device)
             outputs = model.forward(input_ids=input_ids)
             loss, correct, num_targets = calculate_loss_and_accuracy(outputs, input_ids, device, pad_id)
             # -- 加入epoch_loss, epoch_acc -- #
@@ -186,7 +186,7 @@ def evaluate(epoch, model, device, test_dataloader, multi_gpu, args):
             if args.gradient_accumulation > 1:
                 loss = loss / args.gradient_accumulation
                 accuracy = accuracy / args.gradient_accumulation
-            data_iter.set_description("训练集 epoch: {} / {} ,loss {:.4f} ,accuracy {:.2f}%"\
+            data_iter.set_description("验证集 epoch: {} / {} ,valid_loss {:.4f} ,valid_accuracy {:.2f}%"\
                                       .format(epoch, config.epochs, loss, accuracy * 100))
             # tb_writer.add_scalar('loss', loss.item(), overall_step)
     # 计算epoch acc, epoch_loss
