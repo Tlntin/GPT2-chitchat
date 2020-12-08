@@ -129,7 +129,7 @@ def train(model, device, train_dataloader, test_dataloader, multi_gpu, args):
                 if (overall_step + 1) % args.log_step == 0:
                     tb_writer.add_scalar('loss', loss.item(), overall_step)
             # 输出最新loss与acc
-            data_iter.set_description("训练集epoch {}/{} train_loss {:.4f}, train_accuracy {:.2f}%"\
+            data_iter.set_description("epoch:{}/{}, train_loss:{:.4f}, train_acc:{:.2f}%"\
                                       .format(epoch + 1, config.epochs, loss, accuracy * 100))
         epoch_train_loss = running_train_loss / running_train_num
         epoch_train_acc = running_train_correct / running_train_num
@@ -186,7 +186,7 @@ def evaluate(epoch, model, device, test_dataloader, multi_gpu, args):
             if args.gradient_accumulation > 1:
                 loss = loss / args.gradient_accumulation
                 accuracy = accuracy / args.gradient_accumulation
-            data_iter.set_description("验证集 epoch: {} / {} ,valid_loss {:.4f} ,valid_accuracy {:.2f}%"\
+            data_iter.set_description("epoch:{}/{}, valid_loss:{:.4f}, valid_acc:{:.2f}%"\
                                       .format(epoch, config.epochs, loss, accuracy * 100))
             # tb_writer.add_scalar('loss', loss.item(), overall_step)
     # 计算epoch acc, epoch_loss
