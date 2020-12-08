@@ -1,5 +1,4 @@
 from torch.utils.data import Dataset
-import torch
 
 
 class MyDataset(Dataset):
