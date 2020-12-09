@@ -47,9 +47,9 @@ def create_model(vocab_size, device):
     # print('model config:\n{}'.format(model.config.to_json_string()))
     model = model.to(device)
     # 是否使用多块GPU进行并行运算
-    if config.cuda and torch.cuda.device_count() > 1:
+    if config.cuda and torch.cuda.device_count() > 1 and ',' in config.device:
         print("开始使用多GPU进行训练")
-        model = DataParallel(model, device_ids=[int(i) for i in config.device.split(',')])
+        model = DataParallel(model, device_ids=[int(i.strip()) for i in config.device.split(',')])
         multi_gpu = True
     elif config.cuda:
         print('当前使用单张GPU进行训练')
