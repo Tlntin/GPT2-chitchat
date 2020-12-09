@@ -1,7 +1,6 @@
 """
 第一步：文件预处理
 """
-from config_info.train_config import Config
 from tqdm import tqdm
 from jieba import analyse, lcut
 from jieba import posseg
@@ -10,7 +9,8 @@ import os
 import time
 
 text_rank = analyse.textrank
-config = Config()
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+data_dir = os.path.join(parent_dir, 'data')
 
 
 class DataPreProcess(object):
@@ -55,7 +55,6 @@ class DataPreProcess(object):
         print('过滤前共有{}条语料，过滤后有{}条语料'.format(len(content_list), len(material_list)))
         data_iter = tqdm(material_list)
         result_text = ''
-        i = 0
         for title, content in data_iter:
             # 抽取关键词
             data_iter.set_description('正在抽取关键词，生成文案问答语料')
@@ -69,11 +68,7 @@ class DataPreProcess(object):
                     temp_text = keyword + '\n' + title.strip() + '\n\n'
                     temp_text += keyword + '\n' + content.strip() + '\n\n'
                     result_text += temp_text
-
-            if i > 2000:
-                break
-            i += 1
-        with open(os.path.join(config.data_dir, 'train1.txt'), 'wt', encoding='utf-8') as f:
+        with open(os.path.join(data_dir, 'train1.txt'), 'wt', encoding='utf-8') as f:
             f.write(result_text)
         print('语料1写入成功')
 
@@ -89,7 +84,6 @@ class DataPreProcess(object):
         material_list = [title for title in title_list if self.min_length < len(title) < self.max_length]
         print('过滤前共有{}条语料，过滤后有{}条语料'.format(len(title_list), len(material_list)))
         result_text = ''
-        i = 0
         data_iter = tqdm(material_list)
         for title in data_iter:
             # 抽取关键词
@@ -105,17 +99,14 @@ class DataPreProcess(object):
                     temp_text = keyword + '\n' + title.strip() + '\n'
                     temp_text += '\n'  # 多一个换行代表该广告结束
                     result_text += temp_text
-            if i > 100:
-                break
-            i += 1
-        with open(os.path.join(config.data_dir, 'train2.txt'), 'wt', encoding='utf-8') as f:
+        with open(os.path.join(data_dir, 'train2.txt'), 'wt', encoding='utf-8') as f:
             f.write(result_text)
         print('语料2写入成功')
 
 
 if __name__ == '__main__':
-    file1 = os.path.join(config.data_dir, 'item_desc_dataset.txt')
-    file2 = os.path.join(config.data_dir, 'content_tag_dataset.txt')
+    file1 = os.path.join(data_dir, 'item_desc_dataset.txt')
+    file2 = os.path.join(data_dir, 'content_tag_dataset.txt')
     data1 = DataPreProcess(file1, file2)
     # data1.filter_file()
     data1.process_file1()
