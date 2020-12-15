@@ -5,35 +5,13 @@ from datetime import datetime
 import logging
 from transformers.models.gpt2 import GPT2LMHeadModel
 from transformers import BertTokenizer
+from config_info.interact_config import InteractConfig
 # from chatbot.model import DialogueGPT2Model
 import torch.nn.functional as F
 
 PAD = '[PAD]'
 pad_id = 0
-
-
-def set_interact_args():
-    """
-    Sets up the training arguments.
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--device', default='0', type=str, required=False, help='生成设备')
-    parser.add_argument('--temperature', default=1, type=float, required=False, help='生成的temperature')
-    parser.add_argument('--topk', default=8, type=int, required=False, help='最高k选1')
-    parser.add_argument('--topp', default=0, type=float, required=False, help='最高积累概率')
-    parser.add_argument('--model_config', default='config/model_config_dialogue_small.json', type=str, required=False,
-                        help='模型参数')
-    parser.add_argument('--log_path', default='data/interacting.log', type=str, required=False, help='interact日志存放位置')
-    parser.add_argument('--voca_path', default='vocabulary/vocab_small.txt', type=str, required=False, help='选择词库')
-    parser.add_argument('--dialogue_model_path', default='dialogue_model_path/', type=str, required=False, help='对话模型路径')
-    parser.add_argument('--save_samples_path', default="sample/", type=str, required=False, help="保存聊天记录的文件路径")
-    parser.add_argument('--repetition_penalty', default=1.0, type=float, required=False,
-                        help="重复惩罚参数，若生成的对话重复性较高，可适当提高该参数")
-    parser.add_argument('--seed', type=int, default=None, help='设置种子用于生成随机数，以使得训练的结果是确定的')
-    parser.add_argument('--max_len', type=int, default=25, help='每个utterance的最大长度,超过指定长度则进行截断')
-    parser.add_argument('--max_history_len', type=int, default=5, help="dialogue history的最大长度")
-    parser.add_argument('--no_cuda', action='store_true', help='不使用GPU进行预测')
-    return parser.parse_args()
+config = InteractConfig()
 
 
 def create_logger(args):
@@ -96,21 +74,20 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
 
 
 def main():
-    args = set_interact_args()
-    logger = create_logger(args)
+    logger = create_logger(config)
     # 当用户使用GPU,并且GPU可用时
-    args.cuda = torch.cuda.is_available() and not args.no_cuda
-    device = 'cuda' if args.cuda else 'cpu'
+    config.cuda = torch.cuda.is_available() and not config.no_cuda
+    device = 'cuda' if config.cuda else 'cpu'
     logger.info('using device:{}'.format(device))
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.device
-    tokenizer = BertTokenizer(vocab_file=args.voca_path)
-    model = GPT2LMHeadModel.from_pretrained(args.dialogue_model_path)
+    os.environ["CUDA_VISIBLE_DEVICES"] = config.device
+    tokenizer = BertTokenizer(vocab_file=config.vocab_path)
+    model = GPT2LMHeadModel.from_pretrained(config.best_checkpoint_path)
     model.to(device)
     model.eval()
-    if args.save_samples_path:
-        if not os.path.exists(args.save_samples_path):
-            os.makedirs(args.save_samples_path)
-        samples_file = open(args.save_samples_path + '/samples.txt', 'a', encoding='utf8')
+    if bool(config.save_samples_path):
+        if not os.path.exists(config.save_samples_path):
+            os.makedirs(config.save_samples_path)
+        samples_file = open(config.save_samples_path + '/samples.txt', 'a', encoding='utf8')
         samples_file.write("聊天记录{}:\n".format(datetime.now()))
         # 存储聊天记录，每个utterance以token的id的形式进行存储
     history = []
@@ -118,28 +95,28 @@ def main():
 
     while True:
         try:
-            text = input("user:")
-            if args.save_samples_path:
-                samples_file.write("user:{}\n".format(text))
+            text = input("请输入广告词:")
+            if config.save_samples_path:
+                samples_file.write("请输入广告词:{}\n".format(text))
             history.append(tokenizer.encode(text))
             input_ids = [tokenizer.cls_token_id]  # 每个input以[CLS]为开头
 
-            for history_id, history_utr in enumerate(history[-args.max_history_len:]):
+            for history_id, history_utr in enumerate(history[-config.max_history_len:]):
                 input_ids.extend(history_utr)
                 input_ids.append(tokenizer.sep_token_id)
             curr_input_tensor = torch.tensor(input_ids).long().to(device)
             generated = []
             # 最多生成max_len个token
-            for _ in range(args.max_len):
+            for _ in range(config.max_len):
                 outputs = model(input_ids=curr_input_tensor)
                 next_token_logits = outputs[0][-1, :]
                 # 对于已生成的结果generated中的每个token添加一个重复惩罚项，降低其生成概率
                 for id in set(generated):
-                    next_token_logits[id] /= args.repetition_penalty
-                next_token_logits = next_token_logits / args.temperature
+                    next_token_logits[id] /= config.repetition_penalty
+                next_token_logits = next_token_logits / config.temperature
                 # 对于[UNK]的概率设为无穷小，也就是说模型的预测结果不可能是[UNK]这个token
                 next_token_logits[tokenizer.convert_tokens_to_ids('[UNK]')] = -float('Inf')
-                filtered_logits = top_k_top_p_filtering(next_token_logits, top_k=args.topk, top_p=args.topp)
+                filtered_logits = top_k_top_p_filtering(next_token_logits, top_k=config.top_k, top_p=config.top_prob)
                 # torch.multinomial表示从候选集合中无放回地进行抽取num_samples个元素，权重越高，抽到的几率越高，返回元素的下标
                 next_token = torch.multinomial(F.softmax(filtered_logits, dim=-1), num_samples=1)
                 if next_token == tokenizer.sep_token_id:  # 遇到[SEP]则表明response生成结束
@@ -151,10 +128,10 @@ def main():
             history.append(generated)
             text = tokenizer.convert_ids_to_tokens(generated)
             print("chatbot:" + "".join(text))
-            if args.save_samples_path:
+            if config.save_samples_path:
                 samples_file.write("chatbot:{}\n".format("".join(text)))
         except KeyboardInterrupt:
-            if args.save_samples_path:
+            if config.save_samples_path:
                 samples_file.close()
             break
 
